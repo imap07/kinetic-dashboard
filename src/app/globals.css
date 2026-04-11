@@ -1,0 +1,79 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 220 16% 6%;
+    --foreground: 210 40% 96%;
+
+    --card: 220 16% 9%;
+    --card-foreground: 210 40% 96%;
+
+    --popover: 220 16% 9%;
+    --popover-foreground: 210 40% 96%;
+
+    --primary: 78 100% 50%;
+    --primary-foreground: 220 16% 6%;
+
+    --secondary: 220 16% 14%;
+    --secondary-foreground: 210 40% 96%;
+
+    --muted: 220 16% 14%;
+    --muted-foreground: 215 20% 55%;
+
+    --accent: 220 16% 14%;
+    --accent-foreground: 210 40% 96%;
+
+    --destructive: 0 62% 55%;
+    --destructive-foreground: 210 40% 96%;
+
+    --border: 220 16% 14%;
+    --input: 220 16% 14%;
+    --ring: 78 100% 50%;
+
+    --radius: 0.5rem;
+
+    --sidebar-width: 240px;
+  }
+
+  * {
+    @apply border-[#1e2530];
+  }
+
+  body {
+    @apply bg-[#0B0E11] text-gray-100 antialiased;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-[#1e2530] rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-[#2a3340];
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .sidebar-link {
+    @apply flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-400 transition-all duration-150 hover:text-gray-100 hover:bg-white/5;
+  }
+
+  .sidebar-link.active {
+    @apply text-[#C6FF00] bg-[#C6FF00]/10 hover:bg-[#C6FF00]/15;
+  }
+}
