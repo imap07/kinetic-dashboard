@@ -6,6 +6,7 @@ import {
   LayoutDashboard,
   Users,
   ScrollText,
+  Share2,
   Zap,
   ChevronRight,
 } from "lucide-react";
@@ -21,6 +22,11 @@ const navItems = [
     label: "Users",
     href: "/users",
     icon: Users,
+  },
+  {
+    label: "Referrals",
+    href: "/referrals",
+    icon: Share2,
   },
   {
     label: "Audit Log",

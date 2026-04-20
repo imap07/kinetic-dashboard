@@ -1,9 +1,40 @@
+// NOTE: `api.ts` is imported by both server components (where
+// `process.env.BACKEND_URL` is available) and client components (where only
+// `NEXT_PUBLIC_*` vars survive the bundler). We check both so a single source
+// of truth works in both environments.
 const BACKEND_URL =
+  process.env.NEXT_PUBLIC_BACKEND_URL ||
   process.env.BACKEND_URL ||
   "https://kinectic-app-test.4a7ymmxg576we.ca-central-1.cs.amazonlightsail.com";
 
 interface FetchOptions extends RequestInit {
   token?: string;
+}
+
+/**
+ * Thrown when the backend rejects our JWT because the user's tokenVersion
+ * changed (password reset, forced logout, role change, etc.) or the token
+ * is otherwise invalid. Callers should treat this as "log the user out and
+ * bounce them to /login" — there's no way to recover in-place.
+ */
+export class SessionRevokedError extends Error {
+  constructor(message = "Session revoked") {
+    super(message);
+    this.name = "SessionRevokedError";
+  }
+}
+
+function isRevokedResponse(status: number, body: unknown): boolean {
+  if (status !== 401 && status !== 403) return false;
+  const msg =
+    typeof body === "object" && body !== null && "message" in body
+      ? String((body as { message?: unknown }).message ?? "")
+      : "";
+  return (
+    msg.toLowerCase().includes("revoked") ||
+    msg.toLowerCase().includes("user not found or inactive") ||
+    status === 401
+  );
 }
 
 /**
@@ -34,11 +65,16 @@ export async function apiFetch<T = unknown>(
 
   if (!res.ok) {
     let errorMessage = `API error ${res.status}`;
+    let body: unknown = null;
     try {
-      const body = await res.json();
-      errorMessage = body?.message ?? errorMessage;
+      body = await res.json();
+      errorMessage =
+        (body as { message?: string })?.message ?? errorMessage;
     } catch {
       // ignore parse error, keep default message
+    }
+    if (isRevokedResponse(res.status, body)) {
+      throw new SessionRevokedError(errorMessage);
     }
     throw new Error(errorMessage);
   }
@@ -93,11 +129,16 @@ export async function fetchWithAuth<T = unknown>(
 
   if (!res.ok) {
     let errorMessage = `API error ${res.status}`;
+    let body: unknown = null;
     try {
-      const body = await res.json();
-      errorMessage = body?.message ?? errorMessage;
+      body = await res.json();
+      errorMessage =
+        (body as { message?: string })?.message ?? errorMessage;
     } catch {
       // ignore
+    }
+    if (isRevokedResponse(res.status, body)) {
+      throw new SessionRevokedError(errorMessage);
     }
     throw new Error(errorMessage);
   }
@@ -116,6 +157,18 @@ export interface OverviewStats {
   newUsersLast30d: number;
   activeLeagues: number;
 }
+
+export type AuthProvider = "email" | "google" | "apple" | "x";
+
+export type AcquisitionSource =
+  | "instagram"
+  | "tiktok"
+  | "friend"
+  | "appstore"
+  | "google"
+  | "youtube"
+  | "twitter"
+  | "other";
 
 export interface AdminUser {
   _id: string;
@@ -138,6 +191,12 @@ export interface AdminUser {
   lastSeenAt?: string;
   lastLoginCountry?: string;
   lastLoginProvider?: string;
+  /** All providers linked to the account (from User.providers[]). */
+  providers?: AuthProvider[];
+  /** Whether the user finished the onboarding flow. */
+  onboardingCompleted?: boolean;
+  /** Self-reported acquisition channel (collected at onboarding). */
+  acquisitionSource?: AcquisitionSource;
   role?: string;
   createdAt: string;
   updatedAt: string;
@@ -206,8 +265,22 @@ export function getUsers(
   );
 }
 
-export function getUserDetail(token: string, id: string): Promise<AdminUser> {
-  return fetchWithAuth<AdminUser>(`/api/admin/users/${id}`, token);
+/**
+ * The backend wraps the user in `{ user, wallet, loginSummary }`. The dashboard
+ * only cares about the user fields today, so we unwrap here to keep call sites
+ * simple. If a future page needs wallet/loginSummary, expose a second wrapper
+ * rather than changing this signature.
+ */
+export async function getUserDetail(
+  token: string,
+  id: string,
+): Promise<AdminUser> {
+  const res = await fetchWithAuth<{
+    user: AdminUser;
+    wallet?: unknown;
+    loginSummary?: unknown;
+  }>(`/api/admin/users/${id}`, token);
+  return res.user;
 }
 
 export function banUser(
@@ -243,6 +316,41 @@ export function adjustCoins(
     method: "POST",
     body: JSON.stringify({ amount, reason }),
   });
+}
+
+// ─── Referrals (admin read-only) ───────────────────────────────
+
+export interface ReferralStats {
+  total: number;
+  pending: number;
+  qualified: number;
+  rewarded: number;
+  blocked: number;
+  coinsDistributed: number;
+}
+
+export interface TopReferrer {
+  userId: string;
+  displayName: string | null;
+  email: string | null;
+  referralCode: string | null;
+  rewardedCount: number;
+  pendingCount: number;
+  coinsEarned: number;
+}
+
+export function getReferralStats(token: string): Promise<ReferralStats> {
+  return fetchWithAuth<ReferralStats>("/api/admin/referrals/stats", token);
+}
+
+export function getTopReferrers(
+  token: string,
+  limit = 20,
+): Promise<TopReferrer[]> {
+  return fetchWithAuth<TopReferrer[]>(
+    `/api/admin/referrals/top?limit=${limit}`,
+    token,
+  );
 }
 
 export function getAuditLog(
