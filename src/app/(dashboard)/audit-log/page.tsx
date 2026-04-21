@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { ScrollText, ChevronLeft, ChevronRight } from "lucide-react";
-import { getAuditLog } from "@/lib/api";
+import { getAuditLog, SessionRevokedError } from "@/lib/api";
 import type { AuditLogEntry, PaginatedAuditLog } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -75,6 +75,10 @@ export default function AuditLogPage() {
       });
       setResult(data);
     } catch (e) {
+      if (e instanceof SessionRevokedError) {
+        window.location.href = "/api/force-logout";
+        return;
+      }
       setError(e instanceof Error ? e.message : "Failed to load audit log");
     } finally {
       setLoading(false);

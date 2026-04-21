@@ -22,10 +22,42 @@ import {
   unbanUser,
   forceLogout,
   adjustCoins,
+  getUserTransactions,
+  getUserSubscription,
+  SessionRevokedError,
 } from "@/lib/api";
-import type { AdminUser } from "@/lib/api";
+import type {
+  AdminUser,
+  UserTransaction,
+  UserSubscriptionInfo,
+} from "@/lib/api";
+import {
+  computeUserQuality,
+  getLoginChannel,
+  getAcquisitionLabel,
+  isDisposableEmail,
+  type QualityBadge as QualityBadgeInfo,
+  type ChannelBadge as ChannelBadgeInfo,
+} from "@/lib/quality";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+
+const QUALITY_TONE_CLASSES: Record<QualityBadgeInfo["tone"], string> = {
+  lime: "bg-[#C6FF00]/10 text-[#C6FF00] border-[#C6FF00]/20",
+  emerald: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+  blue: "bg-blue-500/10 text-blue-400 border-blue-500/20",
+  amber: "bg-amber-500/10 text-amber-400 border-amber-500/20",
+  red: "bg-red-500/10 text-red-400 border-red-500/20",
+  gray: "bg-gray-500/10 text-gray-400 border-gray-500/20",
+};
+
+const CHANNEL_TONE_CLASSES: Record<ChannelBadgeInfo["tone"], string> = {
+  black: "bg-white/5 text-gray-100 border-white/10",
+  blue: "bg-blue-500/10 text-blue-400 border-blue-500/20",
+  red: "bg-red-500/10 text-red-400 border-red-500/20",
+  slate: "bg-slate-500/10 text-slate-300 border-slate-500/20",
+  gray: "bg-gray-500/10 text-gray-400 border-gray-500/20",
+};
 import {
   Dialog,
   DialogContent,
@@ -54,7 +86,8 @@ const AVATAR_COLORS = [
   "from-indigo-500 to-indigo-700",
 ];
 
-function avatarGradient(id: string) {
+function avatarGradient(id: string | undefined | null) {
+  if (!id) return AVATAR_COLORS[0];
   let hash = 0;
   for (let i = 0; i < id.length; i++) hash = id.charCodeAt(i) + ((hash << 5) - hash);
   return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
@@ -71,6 +104,8 @@ export default function UserDetailPage() {
   const [user, setUser] = useState<AdminUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [transactions, setTransactions] = useState<UserTransaction[]>([]);
+  const [subscription, setSubscription] = useState<UserSubscriptionInfo | null>(null);
 
   const [dialogType, setDialogType] = useState<DialogType>(null);
   const [actionLoading, setActionLoading] = useState(false);
@@ -85,9 +120,19 @@ export default function UserDetailPage() {
     setLoading(true);
     setError(null);
     try {
-      const data = await getUserDetail(token, id);
+      const [data, tx, sub] = await Promise.all([
+        getUserDetail(token, id),
+        getUserTransactions(token, id, 50).catch(() => null),
+        getUserSubscription(token, id).catch(() => null),
+      ]);
       setUser(data);
+      setTransactions(Array.isArray(tx) ? tx : (tx?.data ?? []));
+      setSubscription(sub);
     } catch (e) {
+      if (e instanceof SessionRevokedError) {
+        window.location.href = "/api/force-logout";
+        return;
+      }
       setError(e instanceof Error ? e.message : "Failed to load user");
     } finally {
       setLoading(false);
@@ -179,6 +224,27 @@ export default function UserDetailPage() {
                 <h1 className="text-xl font-bold text-white">
                   {user.displayName || user.username || "Unknown"}
                 </h1>
+                {(() => {
+                  const quality = computeUserQuality(user);
+                  return (
+                    <Badge
+                      title={quality.tooltip}
+                      className={`${QUALITY_TONE_CLASSES[quality.tone]} border text-[10px] uppercase tracking-wide font-semibold hover:bg-transparent`}
+                    >
+                      {quality.label}
+                    </Badge>
+                  );
+                })()}
+                {(() => {
+                  const channel = getLoginChannel(user);
+                  return channel ? (
+                    <Badge
+                      className={`${CHANNEL_TONE_CLASSES[channel.tone]} border text-[10px] uppercase tracking-wide font-semibold hover:bg-transparent`}
+                    >
+                      {channel.label}
+                    </Badge>
+                  ) : null;
+                })()}
                 {user.isPremium && (
                   <Badge className="bg-[#C6FF00]/10 text-[#C6FF00] border border-[#C6FF00]/20 text-[10px] uppercase tracking-wide font-semibold hover:bg-[#C6FF00]/10">
                     Pro
@@ -192,6 +258,14 @@ export default function UserDetailPage() {
                 {isBanned && (
                   <Badge className="bg-red-500/10 text-red-400 border border-red-500/20 text-[10px] uppercase tracking-wide font-semibold hover:bg-red-500/10">
                     Banned
+                  </Badge>
+                )}
+                {isDisposableEmail(user.email) && (
+                  <Badge
+                    title="Disposable email domain detected"
+                    className="bg-red-500/10 text-red-400 border border-red-500/20 text-[10px] uppercase tracking-wide font-semibold hover:bg-red-500/10"
+                  >
+                    Temp Email
                   </Badge>
                 )}
               </div>
@@ -285,7 +359,139 @@ export default function UserDetailPage() {
               label="Member since"
               value={new Date(user.createdAt).toLocaleDateString()}
             />
+            <DetailRow
+              label="Linked providers"
+              value={
+                user.providers && user.providers.length > 0
+                  ? user.providers
+                      .map((p) => p[0].toUpperCase() + p.slice(1))
+                      .join(", ")
+                  : "—"
+              }
+            />
+            <DetailRow
+              label="Acquisition source"
+              value={getAcquisitionLabel(user.acquisitionSource)}
+            />
+            <DetailRow
+              label="Onboarding"
+              value={user.onboardingCompleted ? "Completed" : "Incomplete"}
+            />
+            <DetailRow
+              label="Login count"
+              value={(user.loginCount ?? 0).toLocaleString()}
+            />
           </div>
+        </div>
+      )}
+
+      {/* Subscription */}
+      {user && (
+        <div className="bg-[#111318] border border-[#1e2530] rounded-xl p-5 space-y-3">
+          <h2 className="text-sm font-semibold text-gray-300">Subscription</h2>
+          {subscription ? (
+            <div className="space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                <DetailRow
+                  label="Status"
+                  value={subscription.isPremium ? "Pro (active)" : "Free"}
+                />
+                <DetailRow label="Plan" value={subscription.plan ?? "—"} />
+                <DetailRow
+                  label="Member since"
+                  value={
+                    subscription.memberSince
+                      ? new Date(subscription.memberSince).toLocaleDateString()
+                      : "—"
+                  }
+                />
+              </div>
+              {subscription.grants && subscription.grants.length > 0 && (
+                <div>
+                  <p className="text-xs text-gray-500 mb-1.5">
+                    Recent Pro bonus grants
+                  </p>
+                  <ul className="space-y-1">
+                    {subscription.grants.slice(0, 5).map((g, i) => (
+                      <li
+                        key={i}
+                        className="flex justify-between text-xs text-gray-400"
+                      >
+                        <span>
+                          {new Date(g.at).toLocaleDateString()} ·{" "}
+                          {g.description ?? "grant"}
+                        </span>
+                        <span className="text-[#C6FF00] tabular-nums">
+                          +{g.amount.toLocaleString()}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          ) : (
+            <p className="text-xs text-gray-500">No subscription data</p>
+          )}
+        </div>
+      )}
+
+      {/* Transactions */}
+      {user && (
+        <div className="bg-[#111318] border border-[#1e2530] rounded-xl overflow-hidden">
+          <div className="px-5 py-4 border-b border-[#1e2530]">
+            <h2 className="text-sm font-semibold text-gray-300">
+              Coin Transactions
+            </h2>
+            <p className="text-xs text-gray-500 mt-0.5">Last 50</p>
+          </div>
+          {transactions.length === 0 ? (
+            <div className="px-5 py-8 text-center text-xs text-gray-500">
+              No transactions
+            </div>
+          ) : (
+            <div className="overflow-x-auto max-h-96 overflow-y-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-[#0d1117] text-xs uppercase tracking-wide text-gray-500 sticky top-0">
+                  <tr>
+                    <th className="text-left px-5 py-3 font-medium">When</th>
+                    <th className="text-left px-5 py-3 font-medium">Type</th>
+                    <th className="text-right px-5 py-3 font-medium">Amount</th>
+                    <th className="text-right px-5 py-3 font-medium">Balance</th>
+                    <th className="text-left px-5 py-3 font-medium">Reason</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {transactions.map((t) => (
+                    <tr key={t._id} className="border-t border-[#1e2530]">
+                      <td className="px-5 py-2.5 text-xs text-gray-400 whitespace-nowrap">
+                        {new Date(t.createdAt).toLocaleString()}
+                      </td>
+                      <td className="px-5 py-2.5 text-xs font-mono text-gray-300">
+                        {t.type}
+                      </td>
+                      <td
+                        className={`px-5 py-2.5 text-right tabular-nums font-semibold ${
+                          t.amount >= 0 ? "text-emerald-400" : "text-rose-400"
+                        }`}
+                      >
+                        {t.amount >= 0 ? "+" : ""}
+                        {t.amount.toLocaleString()}
+                      </td>
+                      <td className="px-5 py-2.5 text-right tabular-nums text-gray-300">
+                        {t.balanceAfter != null
+                          ? t.balanceAfter.toLocaleString()
+                          : "—"}
+                      </td>
+                      <td className="px-5 py-2.5 text-xs text-gray-400 max-w-[240px] truncate">
+                        {t.reason ?? "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
 

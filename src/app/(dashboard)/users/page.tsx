@@ -4,10 +4,37 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { Search, Users, ChevronLeft, ChevronRight } from "lucide-react";
-import { getUsers } from "@/lib/api";
+import { getUsers, SessionRevokedError } from "@/lib/api";
 import type { AdminUser, PaginatedUsers } from "@/lib/api";
+import {
+  computeUserQuality,
+  getLoginChannel,
+  isDisposableEmail,
+  type QualityBadge as QualityBadgeInfo,
+  type ChannelBadge as ChannelBadgeInfo,
+} from "@/lib/quality";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+
+// ─── Tailwind class maps for the quality + channel pills ─────────────────────
+// Keeping them as a static lookup so Tailwind's JIT picks up the full class
+// strings at build time (dynamic classnames get purged otherwise).
+const QUALITY_TONE_CLASSES: Record<QualityBadgeInfo["tone"], string> = {
+  lime: "bg-[#C6FF00]/10 text-[#C6FF00] border-[#C6FF00]/20",
+  emerald: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+  blue: "bg-blue-500/10 text-blue-400 border-blue-500/20",
+  amber: "bg-amber-500/10 text-amber-400 border-amber-500/20",
+  red: "bg-red-500/10 text-red-400 border-red-500/20",
+  gray: "bg-gray-500/10 text-gray-400 border-gray-500/20",
+};
+
+const CHANNEL_TONE_CLASSES: Record<ChannelBadgeInfo["tone"], string> = {
+  black: "bg-white/5 text-gray-100 border-white/10",
+  blue: "bg-blue-500/10 text-blue-400 border-blue-500/20",
+  red: "bg-red-500/10 text-red-400 border-red-500/20",
+  slate: "bg-slate-500/10 text-slate-300 border-slate-500/20",
+  gray: "bg-gray-500/10 text-gray-400 border-gray-500/20",
+};
 
 type FilterType = "all" | "active" | "banned" | "premium";
 
@@ -47,10 +74,12 @@ function SkeletonRow() {
           </div>
         </div>
       </td>
-      <td className="px-4 py-3"><Skeleton className="h-3 w-16" /></td>
+      <td className="px-4 py-3"><Skeleton className="h-3 w-32" /></td>
       <td className="px-4 py-3"><Skeleton className="h-5 w-14 rounded-full" /></td>
+      <td className="px-4 py-3"><Skeleton className="h-5 w-16 rounded-full" /></td>
+      <td className="px-4 py-3"><Skeleton className="h-5 w-12 rounded-full" /></td>
       <td className="px-4 py-3"><Skeleton className="h-5 w-14 rounded-full" /></td>
-      <td className="px-4 py-3"><Skeleton className="h-3 w-24" /></td>
+      <td className="px-4 py-3"><Skeleton className="h-3 w-20" /></td>
     </tr>
   );
 }
@@ -92,6 +121,11 @@ export default function UsersPage() {
       const data = await getUsers(token, params as Parameters<typeof getUsers>[1]);
       setResult(data);
     } catch (e) {
+      if (e instanceof SessionRevokedError) {
+        // Stale session — bounce to /login via force-logout route
+        window.location.href = "/api/force-logout";
+        return;
+      }
       setError(e instanceof Error ? e.message : "Failed to load users");
     } finally {
       setLoading(false);
@@ -180,6 +214,12 @@ export default function UsersPage() {
                   Email
                 </th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                  Channel
+                </th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                  Quality
+                </th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">
                   Tier
                 </th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">
@@ -250,6 +290,9 @@ function UserRow({ user, onClick }: { user: AdminUser; onClick: () => void }) {
   const bgColor = avatarColor(uid);
   const isBanned = user.isBanned ?? (user.isActive === false);
   const isPremium = user.isPremium;
+  const quality = computeUserQuality(user);
+  const channel = getLoginChannel(user);
+  const disposable = isDisposableEmail(user.email);
 
   return (
     <tr
@@ -270,7 +313,38 @@ function UserRow({ user, onClick }: { user: AdminUser; onClick: () => void }) {
           </div>
         </div>
       </td>
-      <td className="px-4 py-3 text-gray-400 text-xs">{user.email}</td>
+      <td className="px-4 py-3 text-gray-400 text-xs">
+        <div className="flex items-center gap-1.5">
+          <span>{user.email}</span>
+          {disposable && (
+            <span
+              className="text-[9px] uppercase tracking-wider font-bold text-red-400 bg-red-500/10 border border-red-500/20 px-1 py-0.5 rounded"
+              title="Disposable email domain"
+            >
+              Temp
+            </span>
+          )}
+        </div>
+      </td>
+      <td className="px-4 py-3">
+        {channel ? (
+          <Badge
+            className={`${CHANNEL_TONE_CLASSES[channel.tone]} border text-[10px] uppercase tracking-wide font-semibold hover:bg-transparent`}
+          >
+            {channel.label}
+          </Badge>
+        ) : (
+          <span className="text-gray-700 text-xs">—</span>
+        )}
+      </td>
+      <td className="px-4 py-3">
+        <Badge
+          title={quality.tooltip}
+          className={`${QUALITY_TONE_CLASSES[quality.tone]} border text-[10px] uppercase tracking-wide font-semibold hover:bg-transparent`}
+        >
+          {quality.label}
+        </Badge>
+      </td>
       <td className="px-4 py-3">
         {isPremium ? (
           <Badge className="bg-[#C6FF00]/10 text-[#C6FF00] border border-[#C6FF00]/20 hover:bg-[#C6FF00]/10 text-[10px] uppercase tracking-wide font-semibold">

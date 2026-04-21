@@ -353,6 +353,361 @@ export function getTopReferrers(
   );
 }
 
+// ─── System / Crons ────────────────────────────────────────────
+
+export interface CronSummaryEntry {
+  name: string;
+  lastStartedAt: string;
+  lastStatus: "running" | "ok" | "error";
+  lastDurationMs?: number;
+  lastError?: string;
+  recentRunCount: number;
+  recentErrorCount: number;
+}
+
+export interface CronRunEntry {
+  _id: string;
+  name: string;
+  startedAt: string;
+  finishedAt?: string;
+  durationMs?: number;
+  status: "running" | "ok" | "error";
+  errorMessage?: string;
+  itemsProcessed?: number;
+}
+
+export function getCronSummary(token: string): Promise<CronSummaryEntry[]> {
+  return fetchWithAuth<CronSummaryEntry[]>("/api/admin/crons/summary", token);
+}
+
+export function getCronRecent(
+  token: string,
+  limit = 50,
+): Promise<CronRunEntry[]> {
+  return fetchWithAuth<CronRunEntry[]>(
+    `/api/admin/crons/recent?limit=${limit}`,
+    token,
+  );
+}
+
+// ─── Feature flags ─────────────────────────────────────────────
+
+export interface FeatureFlagEntry {
+  key: string;
+  value: boolean;
+  default: boolean;
+}
+
+export function listFeatureFlags(token: string): Promise<FeatureFlagEntry[]> {
+  return fetchWithAuth<FeatureFlagEntry[]>("/api/admin/feature-flags", token);
+}
+
+export function setFeatureFlag(
+  token: string,
+  key: string,
+  value: boolean,
+): Promise<{ key: string; value: boolean }> {
+  return fetchWithAuth<{ key: string; value: boolean }>(
+    `/api/admin/feature-flags`,
+    token,
+    {
+      method: "PATCH",
+      body: JSON.stringify({ key, value }),
+    },
+  );
+}
+
+// ─── Giftcards ─────────────────────────────────────────────────
+
+export interface AdminGiftcard {
+  id: string;
+  userId: string;
+  userEmail?: string;
+  userName?: string;
+  giftcardType: string;
+  dollarValue: number;
+  coinsSpent: number;
+  status: string;
+  requestedAt: string;
+  issuedAt?: string;
+  code?: string;
+  failReason?: string;
+}
+
+export interface GiftcardsQuery {
+  status?: string;
+  page?: number;
+  limit?: number;
+}
+
+export interface PaginatedGiftcards {
+  data: AdminGiftcard[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export function getGiftcards(
+  token: string,
+  params: GiftcardsQuery = {},
+): Promise<PaginatedGiftcards> {
+  const qs = new URLSearchParams();
+  if (params.status) qs.set("status", params.status);
+  if (params.page !== undefined) qs.set("page", String(params.page));
+  if (params.limit !== undefined) qs.set("limit", String(params.limit));
+  const query = qs.toString();
+  return fetchWithAuth<PaginatedGiftcards>(
+    `/api/admin/giftcards${query ? `?${query}` : ""}`,
+    token,
+  );
+}
+
+export function approveGiftcard(
+  token: string,
+  id: string,
+  code?: string,
+): Promise<void> {
+  return fetchWithAuth<void>(`/api/admin/giftcards/${id}/approve`, token, {
+    method: "POST",
+    body: JSON.stringify({ code }),
+  });
+}
+
+export function rejectGiftcard(
+  token: string,
+  id: string,
+  reason: string,
+): Promise<void> {
+  return fetchWithAuth<void>(`/api/admin/giftcards/${id}/reject`, token, {
+    method: "POST",
+    body: JSON.stringify({ reason }),
+  });
+}
+
+// ─── Leagues ───────────────────────────────────────────────────
+
+export interface AdminLeague {
+  id: string;
+  name: string;
+  sport: string;
+  status: string;
+  leagueType?: string;
+  entryFee: number;
+  prizePool: number;
+  participantCount: number;
+  maxParticipants: number;
+  startDate?: string;
+  endDate?: string;
+  isSystemLeague?: boolean;
+  isThemed?: boolean;
+  creatorId?: string;
+  creatorName?: string;
+  creatorEmail?: string;
+  cancelReason?: string;
+}
+
+export interface LeaguesQuery {
+  status?: string;
+  sport?: string;
+  search?: string;
+  page?: number;
+  limit?: number;
+}
+
+export interface PaginatedLeagues {
+  data: AdminLeague[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export function getLeagues(
+  token: string,
+  params: LeaguesQuery = {},
+): Promise<PaginatedLeagues> {
+  const qs = new URLSearchParams();
+  if (params.status) qs.set("status", params.status);
+  if (params.sport) qs.set("sport", params.sport);
+  if (params.search) qs.set("search", params.search);
+  if (params.page !== undefined) qs.set("page", String(params.page));
+  if (params.limit !== undefined) qs.set("limit", String(params.limit));
+  const query = qs.toString();
+  return fetchWithAuth<PaginatedLeagues>(
+    `/api/admin/leagues${query ? `?${query}` : ""}`,
+    token,
+  );
+}
+
+export function suspendLeague(
+  token: string,
+  id: string,
+  reason: string,
+): Promise<void> {
+  return fetchWithAuth<void>(`/api/admin/leagues/${id}/suspend`, token, {
+    method: "POST",
+    body: JSON.stringify({ reason }),
+  });
+}
+
+// ─── Push broadcast ────────────────────────────────────────────
+
+export type PushSegment =
+  | "all"
+  | "premium"
+  | "free"
+  | "inactive_7d"
+  | "sport"
+  | "country"
+  | "userIds";
+
+export interface PushBroadcastPayload {
+  segment: PushSegment;
+  title: string;
+  body: string;
+  dryRun?: boolean;
+  sport?: string;
+  country?: string;
+  userIds?: string[];
+  data?: Record<string, string>;
+}
+
+export interface PushBroadcastResult {
+  dryRun: boolean;
+  targetCount: number;
+  delivered: number;
+}
+
+export function broadcastPush(
+  token: string,
+  payload: PushBroadcastPayload,
+): Promise<PushBroadcastResult> {
+  return fetchWithAuth<PushBroadcastResult>(
+    `/api/admin/push/broadcast`,
+    token,
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+  );
+}
+
+// ─── Bulk coin drop ────────────────────────────────────────────
+
+export interface BulkCoinDropPayload {
+  userIds: string[];
+  amount: number;
+  reason: string;
+  dryRun?: boolean;
+}
+
+export interface BulkCoinDropResult {
+  targetCount: number;
+  applied: number;
+  failed: number;
+}
+
+export function bulkCoinDrop(
+  token: string,
+  payload: BulkCoinDropPayload,
+): Promise<BulkCoinDropResult> {
+  return fetchWithAuth<BulkCoinDropResult>(`/api/admin/coins/bulk`, token, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+// ─── User deep-dive (transactions + subscription) ──────────────
+
+export interface UserTransaction {
+  _id: string;
+  type: string;
+  amount: number;
+  coinType?: string;
+  reason?: string;
+  balanceAfter?: number;
+  createdAt: string;
+}
+
+export interface SubscriptionGrant {
+  amount: number;
+  at: string;
+  description?: string;
+}
+
+export interface UserSubscriptionInfo {
+  isPremium: boolean;
+  plan?: string;
+  memberSince?: string;
+  grants: SubscriptionGrant[];
+}
+
+export interface PaginatedUserTransactions {
+  data: UserTransaction[];
+  total: number;
+  page: number;
+  pages: number;
+}
+
+export function getUserTransactions(
+  token: string,
+  id: string,
+  limit = 100,
+): Promise<PaginatedUserTransactions> {
+  return fetchWithAuth<PaginatedUserTransactions>(
+    `/api/admin/users/${id}/transactions?limit=${limit}`,
+    token,
+  );
+}
+
+export function getUserSubscription(
+  token: string,
+  id: string,
+): Promise<UserSubscriptionInfo> {
+  return fetchWithAuth<UserSubscriptionInfo>(
+    `/api/admin/users/${id}/subscription`,
+    token,
+  );
+}
+
+// ─── Referrals (moderation) ────────────────────────────────────
+
+export interface BlockedReferral {
+  _id: string;
+  status: string;
+  blockReason?: string;
+  createdAt: string;
+  referrer?: { _id: string; email?: string; displayName?: string };
+  referee?: { _id: string; email?: string; displayName?: string };
+}
+
+export function getBlockedReferrals(
+  token: string,
+  limit = 100,
+): Promise<BlockedReferral[]> {
+  return fetchWithAuth<BlockedReferral[]>(
+    `/api/admin/referrals/blocked?limit=${limit}`,
+    token,
+  );
+}
+
+export function unblockReferral(
+  token: string,
+  id: string,
+): Promise<void> {
+  return fetchWithAuth<void>(`/api/admin/referrals/${id}/unblock`, token, {
+    method: "POST",
+  });
+}
+
+export function forceRewardReferral(
+  token: string,
+  id: string,
+): Promise<void> {
+  return fetchWithAuth<void>(`/api/admin/referrals/${id}/force-reward`, token, {
+    method: "POST",
+  });
+}
+
 export function getAuditLog(
   token: string,
   params: AuditLogParams = {}

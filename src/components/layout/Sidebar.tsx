@@ -9,6 +9,12 @@ import {
   Share2,
   Zap,
   ChevronRight,
+  Activity,
+  Gift,
+  Flag,
+  Trophy,
+  Send,
+  Coins,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -27,6 +33,36 @@ const navItems = [
     label: "Referrals",
     href: "/referrals",
     icon: Share2,
+  },
+  {
+    label: "Giftcards",
+    href: "/giftcards",
+    icon: Gift,
+  },
+  {
+    label: "Leagues",
+    href: "/leagues",
+    icon: Trophy,
+  },
+  {
+    label: "Push",
+    href: "/push",
+    icon: Send,
+  },
+  {
+    label: "Coin Drop",
+    href: "/coins",
+    icon: Coins,
+  },
+  {
+    label: "Feature Flags",
+    href: "/feature-flags",
+    icon: Flag,
+  },
+  {
+    label: "System",
+    href: "/system",
+    icon: Activity,
   },
   {
     label: "Audit Log",

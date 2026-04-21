@@ -3,16 +3,24 @@
 import type { Metadata } from "next";
 import { useState } from "react";
 import { signIn } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const reason = searchParams.get("reason");
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(
+    reason === "revoked"
+      ? "Your session expired or was revoked. Please sign in again."
+      : null,
+  );
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
+    setNotice(null);
     setLoading(true);
 
     const form = new FormData(e.currentTarget);
@@ -63,6 +71,12 @@ export default function LoginPage() {
         {/* Card */}
         <div className="bg-[#141920] border border-[#1e2530] rounded-2xl p-8 shadow-2xl">
           <h2 className="text-lg font-semibold text-white mb-6">Sign in to continue</h2>
+
+          {notice && !error && (
+            <div className="mb-4 rounded-lg border border-amber-500/20 bg-amber-500/10 px-3.5 py-3 text-sm text-amber-400">
+              {notice}
+            </div>
+          )}
 
           {error && (
             <div className="mb-4 rounded-lg border border-red-500/20 bg-red-500/10 px-3.5 py-3 text-sm text-red-400">

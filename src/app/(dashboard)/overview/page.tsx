@@ -10,8 +10,9 @@ import {
   Trophy,
   ExternalLink,
 } from "lucide-react";
+import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
-import { getStats } from "@/lib/api";
+import { getStats, SessionRevokedError } from "@/lib/api";
 import type { OverviewStats } from "@/lib/api";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -73,10 +74,16 @@ async function StatsGrid() {
     try {
       stats = await getStats(token);
     } catch (e) {
+      // Stale JWT (tokenVersion changed on the server) — boot the user
+      // out to /login via our force-logout route instead of rendering
+      // a broken page with a red banner they can't recover from.
+      if (e instanceof SessionRevokedError) {
+        redirect("/api/force-logout");
+      }
       error = e instanceof Error ? e.message : "Failed to load stats";
     }
   } else {
-    error = "Not authenticated";
+    redirect("/api/force-logout");
   }
 
   const cards = [

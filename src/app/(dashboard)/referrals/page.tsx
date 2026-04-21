@@ -14,11 +14,14 @@ import { auth } from "@/lib/auth";
 import {
   getReferralStats,
   getTopReferrers,
+  getBlockedReferrals,
   SessionRevokedError,
   type ReferralStats,
   type TopReferrer,
+  type BlockedReferral,
 } from "@/lib/api";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ReferralModActions } from "./ReferralModActions";
 
 export const metadata: Metadata = {
   title: "Referrals",
@@ -81,12 +84,14 @@ async function ReferralsPanel() {
 
   let stats: ReferralStats | null = null;
   let top: TopReferrer[] = [];
+  let blocked: BlockedReferral[] = [];
   let error: string | null = null;
 
   try {
-    [stats, top] = await Promise.all([
+    [stats, top, blocked] = await Promise.all([
       getReferralStats(token),
       getTopReferrers(token, 20),
+      getBlockedReferrals(token, 50).catch(() => []),
     ]);
   } catch (e) {
     if (e instanceof SessionRevokedError) redirect("/api/force-logout");
@@ -210,6 +215,74 @@ async function ReferralsPanel() {
                     </td>
                     <td className="px-5 py-3 text-right tabular-nums text-[#C6FF00] font-semibold">
                       {r.coinsEarned.toLocaleString()}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Blocked (moderation) */}
+      <div className="bg-[#111318] border border-[#1e2530] rounded-xl overflow-hidden">
+        <div className="px-5 py-4 border-b border-[#1e2530]">
+          <h2 className="text-sm font-semibold text-white">Blocked referrals</h2>
+          <p className="text-xs text-gray-500 mt-0.5">
+            Fraud-flagged — review, unblock, or force reward if legit
+          </p>
+        </div>
+        {blocked.length === 0 ? (
+          <div className="px-5 py-8 text-center text-xs text-gray-500">
+            No blocked referrals
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-[#0d1117] text-xs uppercase tracking-wide text-gray-500">
+                <tr>
+                  <th className="text-left px-5 py-3 font-medium">Referrer</th>
+                  <th className="text-left px-5 py-3 font-medium">Referee</th>
+                  <th className="text-left px-5 py-3 font-medium">Reason</th>
+                  <th className="text-left px-5 py-3 font-medium">When</th>
+                  <th className="text-right px-5 py-3 font-medium">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {blocked.map((b) => (
+                  <tr key={b._id} className="border-t border-[#1e2530]">
+                    <td className="px-5 py-3 text-xs">
+                      {b.referrer ? (
+                        <Link
+                          href={`/users/${b.referrer._id}`}
+                          className="text-white hover:text-[#C6FF00]"
+                        >
+                          {b.referrer.displayName || b.referrer.email}
+                        </Link>
+                      ) : (
+                        <span className="text-gray-500">—</span>
+                      )}
+                    </td>
+                    <td className="px-5 py-3 text-xs">
+                      {b.referee ? (
+                        <Link
+                          href={`/users/${b.referee._id}`}
+                          className="text-white hover:text-[#C6FF00]"
+                        >
+                          {b.referee.displayName || b.referee.email}
+                        </Link>
+                      ) : (
+                        <span className="text-gray-500">—</span>
+                      )}
+                    </td>
+                    <td className="px-5 py-3 text-xs text-rose-400 max-w-[260px] truncate">
+                      {b.blockReason ?? "—"}
+                    </td>
+                    <td className="px-5 py-3 text-xs text-gray-400 whitespace-nowrap">
+                      {new Date(b.createdAt).toLocaleString()}
+                    </td>
+                    <td className="px-5 py-3 text-right">
+                      <ReferralModActions id={b._id} />
                     </td>
                   </tr>
                 ))}
