@@ -246,6 +246,102 @@ export function getStats(token: string): Promise<OverviewStats> {
   return fetchWithAuth<OverviewStats>("/api/admin/stats/overview", token);
 }
 
+// ── Growth metrics ────────────────────────────────────────────────────────────
+
+export interface ActivationFunnel {
+  windowDays: number;
+  steps: Array<{ key: string; label: string; count: number }>;
+}
+export function getActivationFunnel(
+  token: string,
+  days = 30
+): Promise<ActivationFunnel> {
+  return fetchWithAuth<ActivationFunnel>(
+    `/api/admin/stats/activation?days=${days}`,
+    token
+  );
+}
+
+export interface RetentionCohorts {
+  cohorts: Array<{
+    weekStart: string;
+    size: number;
+    d1: number;
+    d7: number;
+    d30: number;
+  }>;
+}
+export function getRetention(
+  token: string,
+  weeks = 8
+): Promise<RetentionCohorts> {
+  return fetchWithAuth<RetentionCohorts>(
+    `/api/admin/stats/retention?weeks=${weeks}`,
+    token
+  );
+}
+
+export interface PushVolume {
+  windowDays: number;
+  rows: Array<{ type: string; sent: number; opened: number; ctr: number }>;
+}
+export function getPushVolume(
+  token: string,
+  days = 30
+): Promise<PushVolume> {
+  return fetchWithAuth<PushVolume>(
+    `/api/admin/stats/push-volume?days=${days}`,
+    token
+  );
+}
+
+export interface AcquisitionBreakdown {
+  windowDays: number;
+  total: number;
+  rows: Array<{ source: string; count: number; pctOfTotal: number }>;
+}
+export function getAcquisition(
+  token: string,
+  days = 30
+): Promise<AcquisitionBreakdown> {
+  return fetchWithAuth<AcquisitionBreakdown>(
+    `/api/admin/stats/acquisition?days=${days}`,
+    token
+  );
+}
+
+export interface StreakDistribution {
+  buckets: Array<{ label: string; count: number }>;
+  atRiskToday: number;
+  reactivationCandidates: number;
+}
+export function getStreakDistribution(
+  token: string
+): Promise<StreakDistribution> {
+  return fetchWithAuth<StreakDistribution>(
+    "/api/admin/stats/streaks",
+    token
+  );
+}
+
+export interface MonetizationSnapshot {
+  totalPro: number;
+  monthly: number;
+  annual: number;
+  unknownTier: number;
+  mrrUsd: number;
+  arpuUsd: number;
+  pricing: { monthly: number; annual: number };
+}
+export function getMonetization(
+  token: string
+): Promise<MonetizationSnapshot> {
+  return fetchWithAuth<MonetizationSnapshot>(
+    "/api/admin/stats/monetization",
+    token
+  );
+}
+
 export function getUsers(
   token: string,
   params: AdminUsersParams = {}

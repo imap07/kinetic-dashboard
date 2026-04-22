@@ -15,6 +15,7 @@ import {
   Trophy,
   Send,
   Coins,
+  TrendingUp,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -23,6 +24,11 @@ const navItems = [
     label: "Overview",
     href: "/overview",
     icon: LayoutDashboard,
+  },
+  {
+    label: "Growth",
+    href: "/growth",
+    icon: TrendingUp,
   },
   {
     label: "Users",
