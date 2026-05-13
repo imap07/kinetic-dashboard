@@ -11,7 +11,12 @@ export default async function DashboardLayout({
 }) {
   const session = await auth();
 
-  if (!session) {
+  // Guard the entire admin area. A valid Kinetic user JWT is NOT
+  // enough — the dashboard UI must only render for actual admins.
+  // Backend API guards reject non-admin tokens, but without this
+  // check the dashboard would still render the sidebar, page shells,
+  // and any client-side data that comes from public endpoints.
+  if (!session || session.user?.role !== "admin") {
     redirect("/login");
   }
 
