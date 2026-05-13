@@ -16,6 +16,7 @@ import {
   Send,
   Coins,
   TrendingUp,
+  ShieldCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -74,6 +75,11 @@ const navItems = [
     label: "Audit Log",
     href: "/audit-log",
     icon: ScrollText,
+  },
+  {
+    label: "Security",
+    href: "/security",
+    icon: ShieldCheck,
   },
 ];
 

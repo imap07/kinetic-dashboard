@@ -34,6 +34,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
         totpCode: { label: "Authenticator code", type: "text" },
+        backupCode: { label: "Recovery code", type: "text" },
       },
       async authorize(credentials) {
         const backendUrl =
@@ -48,6 +49,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             password: credentials?.password,
             ...(credentials?.totpCode
               ? { totpCode: credentials.totpCode }
+              : {}),
+            ...(credentials?.backupCode
+              ? { backupCode: credentials.backupCode }
               : {}),
           }),
         });

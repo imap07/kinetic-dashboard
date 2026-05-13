@@ -820,3 +820,61 @@ export function getAuditLog(
     token
   );
 }
+
+// ── 2FA / TOTP self-service ──────────────────────────────────────────────────
+
+export interface TotpStatus {
+  enrolled: boolean;
+  remainingBackupCodes: number;
+}
+
+export function getTotpStatus(token: string): Promise<TotpStatus> {
+  return fetchWithAuth<TotpStatus>('/api/admin/auth/totp/status', token);
+}
+
+export interface TotpSetupResponse {
+  secret: string;
+  otpauthUrl: string;
+  expiresInSec: number;
+}
+
+export function totpSetup(token: string, password: string): Promise<TotpSetupResponse> {
+  return fetchWithAuth<TotpSetupResponse>('/api/admin/auth/totp/setup', token, {
+    method: 'POST',
+    body: JSON.stringify({ password }),
+  });
+}
+
+export function totpConfirm(token: string, code: string): Promise<{ recoveryCodes: string[] }> {
+  return fetchWithAuth<{ recoveryCodes: string[] }>('/api/admin/auth/totp/confirm', token, {
+    method: 'POST',
+    body: JSON.stringify({ code }),
+  });
+}
+
+export function totpDisable(
+  token: string,
+  password: string,
+  code: string,
+): Promise<{ disabled: true }> {
+  return fetchWithAuth<{ disabled: true }>('/api/admin/auth/totp/disable', token, {
+    method: 'POST',
+    body: JSON.stringify({ password, code }),
+  });
+}
+
+export function totpRegenerateCodes(
+  token: string,
+  password: string,
+  code: string,
+): Promise<{ recoveryCodes: string[] }> {
+  return fetchWithAuth<{ recoveryCodes: string[] }>(
+    '/api/admin/auth/totp/regenerate-codes',
+    token,
+    {
+      method: 'POST',
+      body: JSON.stringify({ password, code }),
+    },
+  );
+}
+

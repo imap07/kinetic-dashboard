@@ -16,6 +16,7 @@ export default function LoginPage() {
       : null,
   );
   const [loading, setLoading] = useState(false);
+  const [useRecoveryCode, setUseRecoveryCode] = useState(false);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -26,19 +27,29 @@ export default function LoginPage() {
     const form = new FormData(e.currentTarget);
     const email = form.get("email") as string;
     const password = form.get("password") as string;
-    const totpCode = (form.get("totp") as string) || undefined;
+    const totpCode = useRecoveryCode
+      ? undefined
+      : (form.get("totp") as string) || undefined;
+    const backupCode = useRecoveryCode
+      ? ((form.get("backup") as string) || undefined)?.toUpperCase()
+      : undefined;
 
     const result = await signIn("credentials", {
       email,
       password,
       totpCode,
+      backupCode,
       redirect: false,
     });
 
     setLoading(false);
 
     if (result?.error) {
-      setError("Invalid credentials. Check your email, password, and TOTP code.");
+      setError(
+        useRecoveryCode
+          ? "Sign-in failed. Check your email, password, and recovery code."
+          : "Sign-in failed. Check your email, password, and authenticator code.",
+      );
     } else {
       router.push("/overview");
       router.refresh();
@@ -123,26 +134,62 @@ export default function LoginPage() {
               />
             </div>
 
-            {/* TOTP */}
-            <div>
-              <label
-                htmlFor="totp"
-                className="block text-sm font-medium text-gray-300 mb-1.5"
-              >
-                Authenticator code
-                <span className="text-gray-500 font-normal ml-1.5">(6-digit TOTP)</span>
-              </label>
-              <input
-                id="totp"
-                name="totp"
-                type="text"
-                inputMode="numeric"
-                autoComplete="one-time-code"
-                maxLength={6}
-                placeholder="000000"
-                className="w-full px-3.5 py-2.5 rounded-lg bg-[#0B0E11] border border-[#1e2530] text-gray-100 text-sm placeholder:text-gray-600 focus:outline-none focus:ring-2 focus:ring-[#C6FF00]/40 focus:border-[#C6FF00]/50 transition-all tracking-[0.3em] font-mono"
-              />
-            </div>
+            {/* Second factor */}
+            {useRecoveryCode ? (
+              <div>
+                <label
+                  htmlFor="backup"
+                  className="block text-sm font-medium text-gray-300 mb-1.5"
+                >
+                  Recovery code
+                  <span className="text-gray-500 font-normal ml-1.5">
+                    (10 chars from your saved list)
+                  </span>
+                </label>
+                <input
+                  id="backup"
+                  name="backup"
+                  type="text"
+                  autoComplete="one-time-code"
+                  maxLength={10}
+                  placeholder="ABCDEFGHJK"
+                  className="w-full px-3.5 py-2.5 rounded-lg bg-[#0B0E11] border border-[#1e2530] text-gray-100 text-sm placeholder:text-gray-600 focus:outline-none focus:ring-2 focus:ring-[#C6FF00]/40 focus:border-[#C6FF00]/50 transition-all tracking-[0.2em] font-mono uppercase"
+                />
+              </div>
+            ) : (
+              <div>
+                <label
+                  htmlFor="totp"
+                  className="block text-sm font-medium text-gray-300 mb-1.5"
+                >
+                  Authenticator code
+                  <span className="text-gray-500 font-normal ml-1.5">(6-digit TOTP)</span>
+                </label>
+                <input
+                  id="totp"
+                  name="totp"
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  maxLength={6}
+                  placeholder="000000"
+                  className="w-full px-3.5 py-2.5 rounded-lg bg-[#0B0E11] border border-[#1e2530] text-gray-100 text-sm placeholder:text-gray-600 focus:outline-none focus:ring-2 focus:ring-[#C6FF00]/40 focus:border-[#C6FF00]/50 transition-all tracking-[0.3em] font-mono"
+                />
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={() => {
+                setUseRecoveryCode((v) => !v);
+                setError(null);
+              }}
+              className="text-xs text-gray-500 hover:text-[#C6FF00] transition-colors"
+            >
+              {useRecoveryCode
+                ? "← Use authenticator code instead"
+                : "Lost your authenticator? Use a recovery code →"}
+            </button>
 
             {/* Submit */}
             <button
