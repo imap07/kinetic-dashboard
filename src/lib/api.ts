@@ -200,6 +200,8 @@ export interface AdminUser {
   role?: string;
   createdAt: string;
   updatedAt: string;
+  /** Soft-delete timestamp. If present, the account is pending hard-delete (30 days). */
+  deletedAt?: string | null;
 }
 
 export interface AdminUsersParams {
@@ -208,6 +210,8 @@ export interface AdminUsersParams {
   search?: string;
   isActive?: string;
   isPremium?: string;
+  /** "true" → only soft-deleted users, "all" → both, omitted → exclude deleted. */
+  deleted?: string;
 }
 
 export interface PaginatedUsers {

@@ -36,7 +36,15 @@ const CHANNEL_TONE_CLASSES: Record<ChannelBadgeInfo["tone"], string> = {
   gray: "bg-gray-500/10 text-gray-400 border-gray-500/20",
 };
 
-type FilterType = "all" | "active" | "banned" | "premium";
+type FilterType = "all" | "active" | "banned" | "premium" | "deleted";
+
+const HARD_DELETE_GRACE_DAYS = 30;
+
+function daysUntilHardDelete(deletedAt: string): number {
+  const deletedMs = new Date(deletedAt).getTime();
+  const elapsedDays = (Date.now() - deletedMs) / (1000 * 60 * 60 * 24);
+  return Math.max(0, Math.ceil(HARD_DELETE_GRACE_DAYS - elapsedDays));
+}
 
 function getInitials(name: string) {
   return name
@@ -117,6 +125,7 @@ export default function UsersPage() {
       if (filter === "active") params.isActive = "true";
       if (filter === "banned") params.isActive = "false";
       if (filter === "premium") params.isPremium = "true";
+      if (filter === "deleted") params.deleted = "true";
 
       const data = await getUsers(token, params as Parameters<typeof getUsers>[1]);
       setResult(data);
@@ -143,6 +152,7 @@ export default function UsersPage() {
     { label: "Active", value: "active" },
     { label: "Banned", value: "banned" },
     { label: "Premium", value: "premium" },
+    { label: "Deleted", value: "deleted" },
   ];
 
   function handleFilterChange(f: FilterType) {
@@ -288,6 +298,7 @@ function UserRow({ user, onClick }: { user: AdminUser; onClick: () => void }) {
   const uid = user._id;
   const initials = getInitials(user.displayName || user.email || "?");
   const bgColor = avatarColor(uid);
+  const isDeleted = !!user.deletedAt;
   const isBanned = user.isBanned ?? (user.isActive === false);
   const isPremium = user.isPremium;
   const quality = computeUserQuality(user);
@@ -357,7 +368,14 @@ function UserRow({ user, onClick }: { user: AdminUser; onClick: () => void }) {
         )}
       </td>
       <td className="px-4 py-3">
-        {isBanned ? (
+        {isDeleted ? (
+          <Badge
+            title={`Soft-deleted on ${new Date(user.deletedAt!).toLocaleString()} — hard-delete in ${daysUntilHardDelete(user.deletedAt!)}d`}
+            className="bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/10 text-[10px] uppercase tracking-wide font-semibold"
+          >
+            Deleted · {daysUntilHardDelete(user.deletedAt!)}d
+          </Badge>
+        ) : isBanned ? (
           <Badge className="bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/10 text-[10px] uppercase tracking-wide font-semibold">
             Banned
           </Badge>
