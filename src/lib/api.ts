@@ -358,6 +358,8 @@ export function getUsers(
     qs.set("isActive", params.isActive);
   if (params.isPremium !== undefined && params.isPremium !== "")
     qs.set("isPremium", params.isPremium);
+  if (params.deleted !== undefined && params.deleted !== "")
+    qs.set("deleted", params.deleted);
   const query = qs.toString();
   return fetchWithAuth<PaginatedUsers>(
     `/api/admin/users${query ? `?${query}` : ""}`,
