@@ -24,12 +24,14 @@ import {
   adjustCoins,
   getUserTransactions,
   getUserSubscription,
+  getUserActivity,
   SessionRevokedError,
 } from "@/lib/api";
 import type {
   AdminUser,
   UserTransaction,
   UserSubscriptionInfo,
+  UserActivity,
 } from "@/lib/api";
 import {
   computeUserQuality,
@@ -106,6 +108,7 @@ export default function UserDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [transactions, setTransactions] = useState<UserTransaction[]>([]);
   const [subscription, setSubscription] = useState<UserSubscriptionInfo | null>(null);
+  const [activity, setActivity] = useState<UserActivity | null>(null);
 
   const [dialogType, setDialogType] = useState<DialogType>(null);
   const [actionLoading, setActionLoading] = useState(false);
@@ -120,14 +123,16 @@ export default function UserDetailPage() {
     setLoading(true);
     setError(null);
     try {
-      const [data, tx, sub] = await Promise.all([
+      const [data, tx, sub, act] = await Promise.all([
         getUserDetail(token, id),
         getUserTransactions(token, id, 50).catch(() => null),
         getUserSubscription(token, id).catch(() => null),
+        getUserActivity(token, id).catch(() => null),
       ]);
       setUser(data);
       setTransactions(Array.isArray(tx) ? tx : (tx?.data ?? []));
       setSubscription(sub);
+      setActivity(act);
     } catch (e) {
       if (e instanceof SessionRevokedError) {
         window.location.href = "/api/force-logout";
@@ -337,11 +342,21 @@ export default function UserDetailPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
             <DetailRow
               label="Last login"
-              value={
-                user.lastLoginAt
-                  ? `${new Date(user.lastLoginAt).toLocaleString()}${user.lastLoginCountry ? ` ${user.lastLoginCountry}` : ""}${user.lastLoginProvider ? ` via ${user.lastLoginProvider}` : ""}`
-                  : "—"
-              }
+              value={(() => {
+                if (!user.lastLoginAt) return "—";
+                const when = new Date(user.lastLoginAt).toLocaleString();
+                const place = [user.lastLoginCity, user.lastLoginRegion, user.lastLoginCountry]
+                  .filter(Boolean)
+                  .join(", ");
+                const via = user.lastLoginProvider ? ` via ${user.lastLoginProvider}` : "";
+                return `${when}${place ? ` · ${place}` : ""}${via}`;
+              })()}
+            />
+            <DetailRow
+              label="Last device"
+              value={[user.lastLoginDeviceOS, user.lastLoginDeviceType, user.lastLoginIp ? `(${user.lastLoginIp})` : null]
+                .filter(Boolean)
+                .join(" · ") || "—"}
             />
             <DetailRow
               label="Coins balance"
@@ -433,6 +448,183 @@ export default function UserDetailPage() {
           ) : (
             <p className="text-xs text-gray-500">No subscription data</p>
           )}
+        </div>
+      )}
+
+      {/* Activity */}
+      {user && activity && (
+        <div className="bg-[#111318] border border-[#1e2530] rounded-xl overflow-hidden">
+          <div className="px-5 py-4 border-b border-[#1e2530]">
+            <h2 className="text-sm font-semibold text-gray-300">Activity</h2>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Recent logins, predictions and league joins
+            </p>
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-3 divide-y lg:divide-y-0 lg:divide-x divide-[#1e2530]">
+            <div className="p-5">
+              <p className="text-xs uppercase tracking-wide text-gray-500 mb-3">
+                Logins ({activity.logins.length})
+              </p>
+              {activity.logins.length === 0 ? (
+                <p className="text-xs text-gray-500">No login events</p>
+              ) : (
+                <ul className="space-y-2 max-h-80 overflow-y-auto">
+                  {activity.logins.map((l, i) => {
+                    const failed = l.outcome !== "success";
+                    return (
+                      <li key={i} className="text-xs">
+                        <div className="flex items-center justify-between">
+                          <span
+                            className={
+                              failed ? "text-rose-400" : "text-gray-200"
+                            }
+                          >
+                            {l.type}
+                            {l.provider ? ` · ${l.provider}` : ""}
+                          </span>
+                          <span className="text-gray-500 tabular-nums">
+                            {new Date(l.at).toLocaleString()}
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-gray-500 mt-0.5">
+                          {[
+                            [l.city, l.region, l.country].filter(Boolean).join(", "),
+                            l.os ?? null,
+                            l.browser ?? null,
+                            l.ipAddress ? `IP ${l.ipAddress}` : null,
+                          ]
+                            .filter(Boolean)
+                            .join(" · ") || "no geo data"}
+                        </p>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+
+            <div className="p-5">
+              <p className="text-xs uppercase tracking-wide text-gray-500 mb-3">
+                Predictions ({activity.predictions.length})
+              </p>
+              {activity.predictions.length === 0 ? (
+                <p className="text-xs text-gray-500">No predictions</p>
+              ) : (
+                <ul className="space-y-2 max-h-80 overflow-y-auto">
+                  {activity.predictions.map((p) => (
+                    <li key={p._id} className="text-xs">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-gray-200 truncate">
+                          {p.match}
+                        </span>
+                        <span
+                          className={`shrink-0 font-mono text-[10px] px-1.5 py-0.5 rounded ${
+                            p.status === "won"
+                              ? "bg-emerald-500/10 text-emerald-400"
+                              : p.status === "lost"
+                              ? "bg-rose-500/10 text-rose-400"
+                              : "bg-gray-500/10 text-gray-400"
+                          }`}
+                        >
+                          {p.status}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-[10px] text-gray-500 mt-0.5">
+                        <span>
+                          {p.sport} · {p.predictionType}
+                          {p.pointsAwarded ? ` · +${p.pointsAwarded}pts` : ""}
+                        </span>
+                        <span className="tabular-nums">
+                          {new Date(p.at).toLocaleDateString()}
+                        </span>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            <div className="p-5">
+              <p className="text-xs uppercase tracking-wide text-gray-500 mb-3">
+                League joins ({activity.leagueJoins.length})
+              </p>
+              {activity.leagueJoins.length === 0 ? (
+                <p className="text-xs text-gray-500">No league joins</p>
+              ) : (
+                <ul className="space-y-2 max-h-80 overflow-y-auto">
+                  {activity.leagueJoins.map((l) => (
+                    <li key={l.leagueId} className="text-xs">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-gray-200 truncate">{l.name}</span>
+                        <span className="shrink-0 text-[10px] text-gray-500 tabular-nums">
+                          {new Date(l.at).toLocaleDateString()}
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-gray-500 mt-0.5">
+                        {l.entryFee > 0
+                          ? `${l.entryFee} coins entry`
+                          : "Free"}{" "}
+                        · {l.status}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Sessions */}
+      {user && activity && activity.sessions.length > 0 && (
+        <div className="bg-[#111318] border border-[#1e2530] rounded-xl overflow-hidden">
+          <div className="px-5 py-4 border-b border-[#1e2530]">
+            <h2 className="text-sm font-semibold text-gray-300">
+              Active sessions ({activity.sessions.length})
+            </h2>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Devices currently logged in
+            </p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-[#0d1117] text-xs uppercase tracking-wide text-gray-500">
+                <tr>
+                  <th className="text-left px-5 py-3 font-medium">Device</th>
+                  <th className="text-left px-5 py-3 font-medium">Location</th>
+                  <th className="text-left px-5 py-3 font-medium">IP</th>
+                  <th className="text-left px-5 py-3 font-medium">Last active</th>
+                  <th className="text-left px-5 py-3 font-medium">Created</th>
+                </tr>
+              </thead>
+              <tbody>
+                {activity.sessions.map((s) => (
+                  <tr key={s._id} className="border-t border-[#1e2530]">
+                    <td className="px-5 py-2.5 text-xs text-gray-300">
+                      <div>{s.deviceName} · {s.deviceType}</div>
+                      <div className="text-[10px] text-gray-500">
+                        {[s.os ?? s.deviceOS, s.browser, s.device]
+                          .filter(Boolean)
+                          .join(" · ") || "—"}
+                      </div>
+                    </td>
+                    <td className="px-5 py-2.5 text-xs text-gray-400">
+                      {[s.city, s.region, s.country].filter(Boolean).join(", ") || "—"}
+                    </td>
+                    <td className="px-5 py-2.5 text-xs font-mono text-gray-400">
+                      {s.ipAddress ?? "—"}
+                    </td>
+                    <td className="px-5 py-2.5 text-xs text-gray-400 whitespace-nowrap">
+                      {new Date(s.lastActiveAt).toLocaleString()}
+                    </td>
+                    <td className="px-5 py-2.5 text-xs text-gray-500 whitespace-nowrap">
+                      {new Date(s.createdAt).toLocaleString()}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 

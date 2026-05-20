@@ -190,6 +190,13 @@ export interface AdminUser {
   lastLoginAt?: string;
   lastSeenAt?: string;
   lastLoginCountry?: string;
+  lastLoginCity?: string | null;
+  lastLoginRegion?: string | null;
+  lastLoginTimezone?: string | null;
+  lastLoginIp?: string | null;
+  lastLoginDeviceOS?: string | null;
+  lastLoginDeviceType?: string | null;
+  lastLoginUserAgent?: string | null;
   lastLoginProvider?: string;
   /** All providers linked to the account (from User.providers[]). */
   providers?: AuthProvider[];
@@ -767,6 +774,80 @@ export function getUserSubscription(
 ): Promise<UserSubscriptionInfo> {
   return fetchWithAuth<UserSubscriptionInfo>(
     `/api/admin/users/${id}/subscription`,
+    token,
+  );
+}
+
+export interface UserActivityLogin {
+  type: string;
+  outcome: string;
+  ipAddress: string | null;
+  userAgent: string | null;
+  provider: string | null;
+  country: string | null;
+  city: string | null;
+  region: string | null;
+  timezone: string | null;
+  ll: [number, number] | null;
+  os: string | null;
+  browser: string | null;
+  device: string | null;
+  at: string;
+}
+export interface UserActivitySession {
+  _id: string;
+  deviceName: string;
+  deviceOS: string;
+  deviceType: string;
+  ipAddress: string | null;
+  country: string | null;
+  city: string | null;
+  region: string | null;
+  os: string | null;
+  browser: string | null;
+  device: string | null;
+  createdAt: string;
+  lastActiveAt: string;
+}
+export interface UserActivityPrediction {
+  _id: string;
+  sport: string;
+  match: string;
+  leagueName: string | null;
+  predictionType: string;
+  status: string;
+  pointsAwarded: number;
+  at: string;
+}
+export interface UserActivityLeagueJoin {
+  leagueId: string;
+  name: string;
+  entryFee: number;
+  status: string;
+  at: string;
+}
+export interface UserActivityCoinTx {
+  _id: string;
+  type: string;
+  amount: number;
+  balanceAfter: number | null;
+  reason: string | null;
+  at: string;
+}
+export interface UserActivity {
+  logins: UserActivityLogin[];
+  sessions: UserActivitySession[];
+  predictions: UserActivityPrediction[];
+  leagueJoins: UserActivityLeagueJoin[];
+  coinTransactions: UserActivityCoinTx[];
+}
+
+export function getUserActivity(
+  token: string,
+  id: string,
+): Promise<UserActivity> {
+  return fetchWithAuth<UserActivity>(
+    `/api/admin/users/${id}/activity`,
     token,
   );
 }
