@@ -353,6 +353,27 @@ export default function UserDetailPage() {
               })()}
             />
             <DetailRow
+              label="Last active"
+              value={(() => {
+                const mostRecent = activity?.sessions
+                  ?.map((s) => s.lastActiveAt)
+                  .sort()
+                  .reverse()[0];
+                if (!mostRecent) return "—";
+                const d = new Date(mostRecent);
+                const ago = Math.floor((Date.now() - d.getTime()) / 60000);
+                const human =
+                  ago < 1
+                    ? "just now"
+                    : ago < 60
+                    ? `${ago}m ago`
+                    : ago < 1440
+                    ? `${Math.floor(ago / 60)}h ago`
+                    : `${Math.floor(ago / 1440)}d ago`;
+                return `${d.toLocaleString()} · ${human}`;
+              })()}
+            />
+            <DetailRow
               label="Last device"
               value={[user.lastLoginDeviceOS, user.lastLoginDeviceType, user.lastLoginIp ? `(${user.lastLoginIp})` : null]
                 .filter(Boolean)
@@ -462,8 +483,12 @@ export default function UserDetailPage() {
           </div>
           <div className="grid grid-cols-1 lg:grid-cols-3 divide-y lg:divide-y-0 lg:divide-x divide-[#1e2530]">
             <div className="p-5">
-              <p className="text-xs uppercase tracking-wide text-gray-500 mb-3">
+              <p className="text-xs uppercase tracking-wide text-gray-500 mb-1">
                 Logins ({activity.logins.length})
+              </p>
+              <p className="text-[10px] text-gray-600 mb-3">
+                Credential events only — app refreshes don&apos;t count.
+                See &quot;Last active&quot; for real recency.
               </p>
               {activity.logins.length === 0 ? (
                 <p className="text-xs text-gray-500">No login events</p>
