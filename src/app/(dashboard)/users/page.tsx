@@ -37,6 +37,35 @@ const CHANNEL_TONE_CLASSES: Record<ChannelBadgeInfo["tone"], string> = {
 };
 
 type FilterType = "all" | "active" | "banned" | "premium" | "deleted";
+type SortBy = "createdAt" | "loginCount" | "lastLoginAt";
+
+const SORT_LABELS: Record<SortBy, string> = {
+  createdAt: "Newest",
+  loginCount: "Most active",
+  lastLoginAt: "Recent login",
+};
+
+/**
+ * Compact "X ago" formatter for the Activity column. Keeps the label
+ * to ≤6 chars (e.g. "2h", "3d", "5w", "1y") so it fits in the narrow
+ * column without wrapping. Returns "—" for null/missing timestamps so
+ * the cell stays visually consistent.
+ */
+function timeAgo(iso?: string | null): string {
+  if (!iso) return "—";
+  const ms = Date.now() - new Date(iso).getTime();
+  if (!Number.isFinite(ms) || ms < 0) return "—";
+  const min = Math.floor(ms / 60_000);
+  if (min < 1) return "now";
+  if (min < 60) return `${min}m`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr}h`;
+  const day = Math.floor(hr / 24);
+  if (day < 30) return `${day}d`;
+  const mo = Math.floor(day / 30);
+  if (mo < 12) return `${mo}mo`;
+  return `${Math.floor(mo / 12)}y`;
+}
 
 const HARD_DELETE_GRACE_DAYS = 30;
 
@@ -87,6 +116,7 @@ function SkeletonRow() {
       <td className="px-4 py-3"><Skeleton className="h-5 w-16 rounded-full" /></td>
       <td className="px-4 py-3"><Skeleton className="h-5 w-12 rounded-full" /></td>
       <td className="px-4 py-3"><Skeleton className="h-5 w-14 rounded-full" /></td>
+      <td className="px-4 py-3"><Skeleton className="h-3 w-16" /></td>
       <td className="px-4 py-3"><Skeleton className="h-3 w-20" /></td>
     </tr>
   );
@@ -99,6 +129,7 @@ export default function UsersPage() {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [filter, setFilter] = useState<FilterType>("all");
+  const [sortBy, setSortBy] = useState<SortBy>("createdAt");
   const [page, setPage] = useState(1);
   const [result, setResult] = useState<PaginatedUsers | null>(null);
   const [loading, setLoading] = useState(true);
@@ -126,6 +157,9 @@ export default function UsersPage() {
       if (filter === "banned") params.isActive = "false";
       if (filter === "premium") params.isPremium = "true";
       if (filter === "deleted") params.deleted = "true";
+      // Only forward non-default sort to keep URLs clean and let the
+      // backend serve from its own default path when omitted.
+      if (sortBy !== "createdAt") params.sortBy = sortBy;
 
       const data = await getUsers(token, params as Parameters<typeof getUsers>[1]);
       setResult(data);
@@ -139,7 +173,7 @@ export default function UsersPage() {
     } finally {
       setLoading(false);
     }
-  }, [session, page, debouncedSearch, filter]);
+  }, [session, page, debouncedSearch, filter, sortBy]);
 
   useEffect(() => {
     fetchUsers();
@@ -210,6 +244,30 @@ export default function UsersPage() {
               </button>
             ))}
           </div>
+          {/* Sort selector — separated visually from filters because
+              it changes ordering, not the cohort. "Most active" sorts
+              by total login count (best for spotting power users);
+              "Recent login" by lastLoginAt (best for spotting reactivated
+              accounts). */}
+          <div className="flex items-center gap-1.5 ml-auto">
+            <span className="text-[10px] uppercase tracking-wider text-gray-600">
+              Sort
+            </span>
+            <select
+              value={sortBy}
+              onChange={(e) => {
+                setSortBy(e.target.value as SortBy);
+                setPage(1);
+              }}
+              className="px-2 py-1 rounded-md bg-[#0B0E11] border border-[#1e2530] text-xs text-gray-300 focus:outline-none focus:ring-2 focus:ring-[#C6FF00]/30 focus:border-[#C6FF00]/40 transition-all"
+            >
+              {(Object.keys(SORT_LABELS) as SortBy[]).map((key) => (
+                <option key={key} value={key}>
+                  {SORT_LABELS[key]}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
         {/* Table */}
@@ -234,6 +292,12 @@ export default function UsersPage() {
                 </th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">
                   Status
+                </th>
+                <th
+                  className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider"
+                  title="Total logins and last seen — pick 'Most active' or 'Recent login' in the Sort selector to order by these."
+                >
+                  Activity
                 </th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">
                   Joined
@@ -384,6 +448,38 @@ function UserRow({ user, onClick }: { user: AdminUser; onClick: () => void }) {
             Active
           </Badge>
         )}
+      </td>
+      <td className="px-4 py-3 text-xs">
+        {/* Two-line cell: total login count (most prominent — answers
+            "is this user actively using the app?") and time since last
+            login (answers "still active or churned?"). Zero-login users
+            show a dim "0 / —" so you can tell them apart from rows that
+            failed to load activity data. */}
+        <div className="flex flex-col leading-tight">
+          <span
+            className={
+              (user.loginCount ?? 0) > 0
+                ? "font-semibold text-gray-200"
+                : "text-gray-600"
+            }
+            title={`Total logins: ${user.loginCount ?? 0}`}
+          >
+            {(user.loginCount ?? 0).toLocaleString()}
+            <span className="ml-1 text-[10px] uppercase tracking-wider text-gray-600">
+              logins
+            </span>
+          </span>
+          <span
+            className="text-[10px] text-gray-500 mt-0.5"
+            title={
+              user.lastLoginAt
+                ? `Last login: ${new Date(user.lastLoginAt).toLocaleString()}`
+                : "Never logged in"
+            }
+          >
+            {user.lastLoginAt ? `last ${timeAgo(user.lastLoginAt)} ago` : "never"}
+          </span>
+        </div>
       </td>
       <td className="px-4 py-3 text-gray-500 text-xs">
         {new Date(user.createdAt).toLocaleDateString()}

@@ -219,6 +219,11 @@ export interface AdminUsersParams {
   isPremium?: string;
   /** "true" → only soft-deleted users, "all" → both, omitted → exclude deleted. */
   deleted?: string;
+  /**
+   * Sort key. Defaults to `createdAt` (newest first) on the server.
+   * `loginCount` / `lastLoginAt` surface the most active accounts.
+   */
+  sortBy?: 'createdAt' | 'loginCount' | 'lastLoginAt';
 }
 
 export interface PaginatedUsers {
