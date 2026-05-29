@@ -1,11 +1,25 @@
 "use client";
 
-import type { Metadata } from "next";
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 
+/**
+ * Outer wrapper. `useSearchParams()` forces client-side rendering and
+ * Next 14 requires it to live inside a `<Suspense>` boundary so the
+ * surrounding shell can be prerendered. Without this wrapper the
+ * `next build` step fails with "missing-suspense-with-csr-bailout"
+ * at /login.
+ */
 export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#0B0E11]" />}>
+      <LoginPageInner />
+    </Suspense>
+  );
+}
+
+function LoginPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const reason = searchParams.get("reason");

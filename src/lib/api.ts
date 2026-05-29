@@ -730,6 +730,110 @@ export function bulkCoinDrop(
   });
 }
 
+// ─── Coin economy admin ────────────────────────────────────────
+
+export interface CoinsOverview {
+  circulation: {
+    wallets: number;
+    balance: number;
+    earned: number;
+    purchased: number;
+    locked: number;
+    totalEarnedLifetime: number;
+    totalSpentLifetime: number;
+  };
+  flows: Record<string, { total: number; count: number }>;
+  purchases: { totalCoinsCredited: number; transactionCount: number };
+  subscriptionGrants: { totalCoinsCredited: number; transactionCount: number };
+  kineticFee: { totalCoins: number; completedLeagues: number };
+  redemptions: {
+    byStatus: Record<string, { count: number; dollars: number; coins: number }>;
+    totalCoins: number;
+    totalDollars: number;
+  };
+  tiers: Record<string, number>;
+}
+
+export function getCoinsOverview(token: string): Promise<CoinsOverview> {
+  return fetchWithAuth<CoinsOverview>("/api/admin/coins/overview", token);
+}
+
+export interface CoinTxRow {
+  id: string;
+  userId: string;
+  userName: string | null;
+  userEmail: string | null;
+  type: string;
+  coinType: string | null;
+  amount: number;
+  balanceBefore: number;
+  balanceAfter: number;
+  referenceId: string | null;
+  description: string | null;
+  createdAt: string;
+}
+
+export interface CoinTxQuery {
+  page?: number;
+  limit?: number;
+  type?: string;
+  coinType?: "earned" | "purchased" | "mixed";
+  userId?: string;
+  from?: string;
+  to?: string;
+}
+
+export interface PaginatedCoinTx {
+  data: CoinTxRow[];
+  total: number;
+  page: number;
+  pages: number;
+}
+
+export function getCoinTransactions(
+  token: string,
+  params: CoinTxQuery = {},
+): Promise<PaginatedCoinTx> {
+  const qs = new URLSearchParams();
+  if (params.page !== undefined) qs.set("page", String(params.page));
+  if (params.limit !== undefined) qs.set("limit", String(params.limit));
+  if (params.type) qs.set("type", params.type);
+  if (params.coinType) qs.set("coinType", params.coinType);
+  if (params.userId) qs.set("userId", params.userId);
+  if (params.from) qs.set("from", params.from);
+  if (params.to) qs.set("to", params.to);
+  const query = qs.toString();
+  return fetchWithAuth<PaginatedCoinTx>(
+    `/api/admin/coins/transactions${query ? `?${query}` : ""}`,
+    token,
+  );
+}
+
+export interface CoinPackageRow {
+  id: string;
+  coins: number;
+  bonusCoins: number;
+  totalCoins: number;
+  priceUsd: number;
+  tag: string | null;
+  purchases: number;
+  grossRevenueUsd: number;
+}
+
+export interface CoinPackagesResponse {
+  packages: CoinPackageRow[];
+  subscription: { monthlyProductId: string; annualProductId: string };
+  totals: {
+    packages: number;
+    totalPurchases: number;
+    totalGrossRevenueUsd: number;
+  };
+}
+
+export function getCoinPackages(token: string): Promise<CoinPackagesResponse> {
+  return fetchWithAuth<CoinPackagesResponse>("/api/admin/coin-packages", token);
+}
+
 // ─── User deep-dive (transactions + subscription) ──────────────
 
 export interface UserTransaction {

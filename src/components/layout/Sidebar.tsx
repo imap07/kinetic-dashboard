@@ -57,7 +57,7 @@ const navItems = [
     icon: Send,
   },
   {
-    label: "Coin Drop",
+    label: "Coins",
     href: "/coins",
     icon: Coins,
   },
