@@ -258,6 +258,53 @@ export interface PaginatedAuditLog {
   limit: number;
 }
 
+// ── User Activity feed ──────────────────────────────────────────────────────
+export interface UserActivityEntry {
+  _id: string;
+  userId: string;
+  userEmail?: string;
+  userDisplayName?: string;
+  action: string;
+  payload: Record<string, unknown>;
+  ip?: string;
+  userAgent?: string;
+  createdAt: string;
+}
+
+export interface UserActivityParams {
+  page?: number;
+  limit?: number;
+  userId?: string;
+  action?: string;
+  dateFrom?: string;
+  dateTo?: string;
+}
+
+export interface PaginatedUserActivity {
+  data: UserActivityEntry[];
+  total: number;
+  page: number;
+  pages: number;
+}
+
+export function getUserActivityFeed(
+  token: string,
+  params: UserActivityParams = {}
+): Promise<PaginatedUserActivity> {
+  const qs = new URLSearchParams();
+  if (params.page !== undefined) qs.set("page", String(params.page));
+  if (params.limit !== undefined) qs.set("limit", String(params.limit));
+  if (params.userId) qs.set("userId", params.userId);
+  if (params.action) qs.set("action", params.action);
+  if (params.dateFrom) qs.set("dateFrom", params.dateFrom);
+  if (params.dateTo) qs.set("dateTo", params.dateTo);
+  const query = qs.toString();
+  return fetchWithAuth<PaginatedUserActivity>(
+    `/api/admin/user-activity${query ? `?${query}` : ""}`,
+    token
+  );
+}
+
 export function getStats(token: string): Promise<OverviewStats> {
   return fetchWithAuth<OverviewStats>("/api/admin/stats/overview", token);
 }

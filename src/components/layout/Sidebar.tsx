@@ -17,6 +17,7 @@ import {
   Coins,
   TrendingUp,
   ShieldCheck,
+  Footprints,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -70,6 +71,11 @@ const navItems = [
     label: "System",
     href: "/system",
     icon: Activity,
+  },
+  {
+    label: "User Activity",
+    href: "/user-activity",
+    icon: Footprints,
   },
   {
     label: "Audit Log",
