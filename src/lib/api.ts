@@ -151,11 +151,19 @@ export async function fetchWithAuth<T = unknown>(
 
 export interface OverviewStats {
   totalUsers: number;
+  // MAU — login in the last 30d. Not the legacy "not banned" flag.
   activeUsers: number;
+  dau: number;
+  wau: number;
   premiumUsers: number;
+  newUsersToday: number;
+  newUsersThisWeek: number;
+  newUsersThisMonth: number;
   newUsersLast7d: number;
   newUsersLast30d: number;
+  topSignupDay: { date: string; count: number } | null;
   activeLeagues: number;
+  usersInActiveLeagues: number;
 }
 
 export type AuthProvider = "email" | "google" | "apple" | "x";
@@ -307,6 +315,55 @@ export function getUserActivityFeed(
 
 export function getStats(token: string): Promise<OverviewStats> {
   return fetchWithAuth<OverviewStats>("/api/admin/stats/overview", token);
+}
+
+// ── Overview segment drill-down ───────────────────────────────────────────────
+
+export type OverviewSegment =
+  | "dau"
+  | "wau"
+  | "mau"
+  | "new-today"
+  | "new-week"
+  | "new-month"
+  | "new-last-7d"
+  | "new-last-30d"
+  | "premium"
+  | "top-signup-day"
+  | "users-in-leagues";
+
+export interface SegmentUser {
+  _id: string;
+  email: string;
+  displayName: string;
+  createdAt: string;
+  lastLoginAt?: string | null;
+  lastLoginCountry?: string | null;
+  lastLoginProvider?: string | null;
+  isPremium: boolean;
+}
+
+export interface PaginatedSegmentUsers {
+  data: SegmentUser[];
+  total: number;
+  page: number;
+  pages: number;
+}
+
+export function getOverviewSegment(
+  token: string,
+  segment: OverviewSegment,
+  page = 1,
+  limit = 20,
+): Promise<PaginatedSegmentUsers> {
+  const qs = new URLSearchParams({
+    page: String(page),
+    limit: String(limit),
+  });
+  return fetchWithAuth<PaginatedSegmentUsers>(
+    `/api/admin/stats/overview/segment/${segment}?${qs.toString()}`,
+    token,
+  );
 }
 
 // ── Growth metrics ────────────────────────────────────────────────────────────
