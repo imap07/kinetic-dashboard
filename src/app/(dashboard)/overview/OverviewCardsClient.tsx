@@ -18,6 +18,7 @@ import { SegmentDialog } from "./SegmentDialog";
 
 interface KpiCardProps {
   label: string;
+  description?: string;
   value: number | string;
   icon: React.ElementType;
   color: string;
@@ -29,6 +30,7 @@ interface KpiCardProps {
 
 function KpiCard({
   label,
+  description,
   value,
   icon: Icon,
   color,
@@ -59,7 +61,10 @@ function KpiCard({
         <p className="text-2xl font-bold text-white tabular-nums">
           {typeof value === "number" ? value.toLocaleString() : value}
         </p>
-        <p className="text-xs font-medium text-gray-500">{label}</p>
+        <p className="text-sm font-semibold text-gray-300">{label}</p>
+        {description ? (
+          <p className="text-xs text-gray-500 leading-snug">{description}</p>
+        ) : null}
       </div>
     </>
   );
@@ -75,6 +80,7 @@ function KpiCard({
 
 interface CardConfig {
   label: string;
+  description?: string;
   value: number | string;
   icon: React.ElementType;
   color: string;
@@ -105,6 +111,7 @@ export function OverviewCardsClient({ stats }: OverviewCardsClientProps) {
   const cards: CardConfig[] = [
     {
       label: "Total Users",
+      description: "Registered all time (excluding deleted)",
       value: stats.totalUsers,
       icon: Users,
       color: "text-blue-400",
@@ -112,7 +119,8 @@ export function OverviewCardsClient({ stats }: OverviewCardsClientProps) {
       border: "border-blue-400/20",
     },
     {
-      label: "DAU · login last 24h",
+      label: "DAU",
+      description: "Logged in within the last 24 hours",
       value: stats.dau,
       icon: Zap,
       color: "text-cyan-400",
@@ -122,7 +130,8 @@ export function OverviewCardsClient({ stats }: OverviewCardsClientProps) {
       segmentTitle: "Daily Active Users (last 24h)",
     },
     {
-      label: "WAU · login last 7d",
+      label: "WAU",
+      description: "Logged in within the last 7 days",
       value: stats.wau,
       icon: Activity,
       color: "text-emerald-400",
@@ -132,7 +141,8 @@ export function OverviewCardsClient({ stats }: OverviewCardsClientProps) {
       segmentTitle: "Weekly Active Users (last 7d)",
     },
     {
-      label: "MAU · login last 30d",
+      label: "MAU",
+      description: "Logged in within the last 30 days",
       value: stats.activeUsers,
       icon: TrendingUp,
       color: "text-teal-400",
@@ -143,6 +153,7 @@ export function OverviewCardsClient({ stats }: OverviewCardsClientProps) {
     },
     {
       label: "Premium Users",
+      description: "Active Pro Monthly or Pro Annual subscription",
       value: stats.premiumUsers,
       icon: Star,
       color: "text-[#C6FF00]",
@@ -153,6 +164,7 @@ export function OverviewCardsClient({ stats }: OverviewCardsClientProps) {
     },
     {
       label: "New Today",
+      description: "Signed up since 00:00 UTC today",
       value: stats.newUsersToday,
       icon: Sunrise,
       color: "text-orange-400",
@@ -162,7 +174,8 @@ export function OverviewCardsClient({ stats }: OverviewCardsClientProps) {
       segmentTitle: "New Users Today",
     },
     {
-      label: "New This Week · since Monday",
+      label: "New This Week",
+      description: "Signed up since Monday 00:00 — calendar week",
       value: stats.newUsersThisWeek,
       icon: CalendarDays,
       color: "text-purple-400",
@@ -172,7 +185,8 @@ export function OverviewCardsClient({ stats }: OverviewCardsClientProps) {
       segmentTitle: "New Users This Week",
     },
     {
-      label: "New This Month · calendar",
+      label: "New This Month",
+      description: "Signed up since the 1st of the current month",
       value: stats.newUsersThisMonth,
       icon: Calendar,
       color: "text-amber-400",
@@ -182,7 +196,8 @@ export function OverviewCardsClient({ stats }: OverviewCardsClientProps) {
       segmentTitle: "New Users This Month",
     },
     {
-      label: "Last 30 days · rolling",
+      label: "Last 30 Days",
+      description: "Signed up in the last 30 days — rolling window",
       value: stats.newUsersLast30d,
       icon: TrendingUp,
       color: "text-pink-400",
@@ -192,7 +207,8 @@ export function OverviewCardsClient({ stats }: OverviewCardsClientProps) {
       segmentTitle: "New Users · Last 30 days (rolling)",
     },
     {
-      label: "Top signup day · last 90d",
+      label: "Top Signup Day",
+      description: "Day with the most signups in the last 90 days",
       value: topSignupValue,
       icon: Crown,
       color: "text-yellow-400",
@@ -203,6 +219,7 @@ export function OverviewCardsClient({ stats }: OverviewCardsClientProps) {
     },
     {
       label: "Active Leagues",
+      description: "Leagues currently OPEN or in progress",
       value: stats.activeLeagues,
       icon: Trophy,
       color: "text-rose-400",
@@ -210,7 +227,8 @@ export function OverviewCardsClient({ stats }: OverviewCardsClientProps) {
       border: "border-rose-400/20",
     },
     {
-      label: "Users in leagues · unique",
+      label: "Users in Leagues",
+      description: "Unique users participating in at least one active league",
       value: stats.usersInActiveLeagues,
       icon: Users,
       color: "text-indigo-400",
